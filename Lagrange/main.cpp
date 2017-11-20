@@ -30,7 +30,7 @@ const static float GAS_CONST = 100.0f; //
 const static float VISC_LAP = 45.0f / (glm::pi<float>() * glm::pow(H, 6.0));
 const static float BOUND = -0.5; //fuerza con que se refleja en bordes
 const static float H2 = H*H;
-const static glm::vec3 Gravity(0.f,-200.0f,0.f);
+const static glm::vec3 Gravity(0.f,-400.0f,0.f);
 
 static float kernelConstant = 315.0f / (64.0f * glm::pi<float>() * glm::pow(H, 9.0f)) ;
 //static float gradientConstant = -945 / (32 * glm::pi<float>() * glm::pow(H, 9.0f));
@@ -98,7 +98,8 @@ float kernel(float r)
 
 glm::vec3 gradient(glm::vec3 r, float d)
 {
-
+	if (d == 0)
+		return glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 res =  gradientConstant * r / d * glm::pow(H - d, 2.0f);
 	//cout << res.x << " " << res.y << " " << res.z << endl;
 	return res;
