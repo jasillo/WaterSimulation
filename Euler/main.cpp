@@ -182,7 +182,7 @@ GLvoid window_display()
 	gluPerspective(60.0, 1.0, 20, 40);
 	glTranslated(-10.0, 0.0, -32.0);
 
-	advance_one_frame(grid, particles, 1. / 30);
+	advance_one_frame(grid, particles, 1. / 20);
 
 	glBegin(GL_POINTS);
 	for (size_t i = 0; i < particles.x.size(); i++)
