@@ -47,21 +47,35 @@ const static int DAM_PARTICLES = 100;
 const static int BLOCK_PARTICLES = 250;
 
 // rendering projection parameters
-const static int WINDOW_WIDTH = 800;
+const static int WINDOW_WIDTH = 600;
 const static int WINDOW_HEIGHT = 600;
 const static double VIEW_WIDTH = 1.5*800.f;
 const static double VIEW_HEIGHT = 1.5*600.f;
 
 void InitSPH(void)
-{
-	cout << "initializing dam break with " << DAM_PARTICLES << " particles" << endl;
-	for (float y = EPS; y < VIEW_HEIGHT - EPS*2.f; y += H)
-		for (float x = VIEW_WIDTH / 4; x <= VIEW_WIDTH / 2; x += H)
-			if (particles.size() < DAM_PARTICLES)
-			{
-				float jitter = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-				particles.push_back(Particle(x + jitter, y));
-			}
+{	
+	for (float x = EPS; x < 800-EPS; x += H)
+	{
+		for (float y = EPS; y <= 2 * EPS; y += H)
+		{
+			particles.push_back(Particle(x, y));
+		}
+	}
+	float x = 300.0, y = 400.0;
+	float temp = 1;
+	particles.push_back(Particle(x, y));
+
+	for (float i = 1.0; i < 4.0; i += 1.0)
+	{
+		temp *= 2;
+		for (float j = 0.0; j < 2 * M_PI; j += M_PI/temp)
+		{
+			//cout << j << endl;
+			particles.push_back(Particle(x + i*H*cos(j), y + i*H*sin(j)));
+			//cout << x + i*H*cos(j) << " - " << y + i*H*sin(j) << endl;
+		}
+	}
+	
 }
 
 void Integrate(void)
@@ -163,15 +177,15 @@ void Render(void)
 
 	glLoadIdentity();
 	glOrtho(0, VIEW_WIDTH, 0, VIEW_HEIGHT, 0, 1);
-
-	for (size_t i = 0; i < 3; i++)
-	{
+	
+	//for (size_t i = 0; i < 3; i++)
+	//{
 		ComputeDensityPressure();
 		ComputeForces();
 		Integrate();
-	}
+	//}
 
-	glTranslated(0,100,0);
+	glTranslated(100,100,0);
 	glColor4f(1.f, 1.f, 1.0f, 1);
 	glBegin(GL_POINTS);
 	for (auto &p : particles)
