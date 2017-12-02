@@ -12,9 +12,9 @@
 
 using namespace std;
 
-#define RED 0
-#define GREEN 0
-#define BLUE 0
+#define RED 1
+#define GREEN 1
+#define BLUE 1
 #define ALPHA 1
 
 GLvoid initGL();
@@ -182,8 +182,9 @@ GLvoid window_display()
 	gluPerspective(60.0, 1.0, 20, 40);
 	glTranslated(-10.0, 0.0, -32.0);
 
-	advance_one_frame(grid, particles, 1. / 20);
+	advance_one_frame(grid, particles, 1. / 30);
 
+	glColor4f(0.0,0.3,0.7,1.0);
 	glBegin(GL_POINTS);
 	for (size_t i = 0; i < particles.x.size(); i++)
 	{

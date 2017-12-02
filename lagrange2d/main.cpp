@@ -18,7 +18,7 @@ const static float H = 16.f; // kernel radius
 const static float HSQ = H*H; // radius^2 for optimization
 const static float MASS = 65.f; // assume all particles have the same mass
 const static float VISC = 250.f; // viscosity constant
-const static float DT = 0.0008f; // integration timestep
+const static float DT = 0.001f; // integration timestep
 
 								 // smoothing kernels defined in Müller and their gradients
 const static float POLY6 = 315.f / (65.f*M_PI*pow(H, 9.f));
@@ -28,6 +28,10 @@ const static float VISC_LAP = 45.f / (M_PI*pow(H, 6.f));
 // simulation parameters
 const static float EPS = H; // boundary epsilon
 const static float BOUND_DAMPING = -0.5f;
+
+float currentTime;
+float oldTime;
+int numOfFrames;
 
 // particle data structure
 // stores position, velocity, and force for integration
@@ -39,7 +43,30 @@ struct Particle {
 };
 
 // solver data
-static vector<Particle> particles;
+vector<Particle> particles;
+vector<int> grilla[50][50];
+vector<vector<int>> distanciaH;
+vector<vector<int>> distancia2H;
+
+void limpiargrilla() {
+	for (size_t i = 0; i < 50; i++)
+	{
+		for (size_t j = 0; j < 50; j++)
+		{
+			grilla[i][j].clear();
+		}
+	}
+}
+
+void llenargrilla() {
+	int x, y;
+	for (size_t i = 0; i < particles.size(); i++)
+	{
+		x = particles[i].x.x / 16;
+		y = particles[i].x.y / 16;
+		grilla[x][y].push_back(i);
+	}
+}
 
 // interaction
 const static int MAX_PARTICLES = 2500;
@@ -54,13 +81,7 @@ const static double VIEW_HEIGHT = 1.5*600.f;
 
 void InitSPH(void)
 {	
-	for (float x = EPS; x < 800-EPS; x += H)
-	{
-		for (float y = EPS; y <= 2 * EPS; y += H)
-		{
-			particles.push_back(Particle(x, y));
-		}
-	}
+	
 	float x = 300.0, y = 400.0;
 	float temp = 1;
 	particles.push_back(Particle(x, y));
@@ -75,7 +96,20 @@ void InitSPH(void)
 			//cout << x + i*H*cos(j) << " - " << y + i*H*sin(j) << endl;
 		}
 	}
-	
+
+	for (float y = EPS; y <= 5 * EPS; y += H)	
+	{
+		for (float x = EPS; x < 800 - EPS; x += H)
+		{
+			if (particles.size() < 250)
+				particles.push_back(Particle(x, y));
+			else
+				break;
+		}
+	}
+	//cout << particles.size() << endl;
+	oldTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+	llenargrilla();
 }
 
 void Integrate(void)
@@ -108,10 +142,13 @@ void Integrate(void)
 			p.x.y = 600 - EPS;
 		}
 	}
+	limpiargrilla();
+	llenargrilla();
 }
 
 void ComputeDensityPressure(void)
 {
+	/*
 	for (auto &pi : particles)
 	{
 		pi.rho = 0.f;
@@ -127,11 +164,38 @@ void ComputeDensityPressure(void)
 			}
 		}
 		pi.p = GAS_CONST*(pi.rho - REST_DENS);
+	}**/
+	
+	int x, y;
+	for (size_t i = 0; i < particles.size(); i++)
+	{
+		x = particles[i].x.x / 16;
+		y = particles[i].x.y / 16;
+		particles[i].rho = 0.f;
+
+		for (size_t m = x -1; m <= x + 1; m++)
+		{
+			for (size_t n = y-1; n <= y + 1; n++)
+			{
+				if (m >= 0 && n >= 0 && m < 50 && n < 50) {
+					for (size_t j = 0; j < grilla[m][n].size(); j++)
+					{
+						float r2 = pow(distance(particles[(grilla[m][n])[j]].x, particles[i].x), 2.0f);						
+						if (r2 < HSQ)
+						{
+							particles[i].rho += MASS*POLY6*pow(HSQ - r2, 3.f);
+						}
+					}
+				}					
+			}
+		}
+		particles[i].p = GAS_CONST*(particles[i].rho - REST_DENS);
 	}
 }
 
 void ComputeForces(void)
 {
+	/*
 	for (auto &pi : particles)
 	{
 		vec2 fpress(0.f, 0.f);
@@ -155,6 +219,40 @@ void ComputeForces(void)
 		fpress *= MASS;
 		vec2 fgrav = G * pi.rho;
 		pi.f = fpress + fvisc + fgrav;
+	}*/
+	int x, y;
+	for (size_t i = 0; i < particles.size(); i++)
+	{
+		vec2 fpress(0.f, 0.f);
+		vec2 fvisc(0.f, 0.f);
+		x = particles[i].x.x / 16;
+		y = particles[i].x.y / 16;
+		
+		for (size_t m = x - 1; m <= x + 1; m++)
+		{
+			for (size_t n = y - 1; n <= y + 1; n++)
+			{
+				if (m >= 0 && n >= 0 && m < 50 && n < 50) {
+					for (size_t j = 0; j < grilla[m][n].size(); j++)
+					{
+						if (i == grilla[m][n][j]) {
+							continue;
+						}
+						vec2 rij = particles[(grilla[m][n])[j]].x - particles[i].x;
+						float r = distance(particles[(grilla[m][n])[j]].x, particles[i].x);
+
+						if (r < H)
+						{
+							fpress += -normalize(rij)*(particles[i].p + particles[(grilla[m][n])[j]].p) / (2.f * particles[(grilla[m][n])[j]].rho) * SPIKY_GRAD*pow(H - r, 2.f);							
+							fvisc += VISC*MASS*(particles[(grilla[m][n])[j]].v - particles[i].v) / particles[(grilla[m][n])[j]].rho * VISC_LAP*(H - r);
+						}
+					}
+				}
+			}
+		}
+		fpress *= MASS;
+		vec2 fgrav = G * particles[i].rho;
+		particles[i].f = fpress + fvisc + fgrav;
 	}
 }
 
@@ -165,33 +263,45 @@ void Update(void)
 
 void InitGL(void)
 {
-	glClearColor(0.0f, 0.0f, 0.0f, 1);
+	glClearColor(1.0f, 1.0f, 1.0f, 1);
 	glEnable(GL_POINT_SMOOTH);
 	glPointSize(4);
 	glMatrixMode(GL_PROJECTION);
+	//oldTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+	numOfFrames = 0;
 }
 
 void Render(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
-
+	currentTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
 	glLoadIdentity();
 	glOrtho(0, VIEW_WIDTH, 0, VIEW_HEIGHT, 0, 1);
 	
 	//for (size_t i = 0; i < 3; i++)
 	//{
-		ComputeDensityPressure();
-		ComputeForces();
-		Integrate();
+	ComputeDensityPressure();
+	ComputeForces();
+	Integrate();
 	//}
-
+	
 	glTranslated(100,100,0);
-	glColor4f(1.f, 1.f, 1.0f, 1);
-	glBegin(GL_POINTS);
+	glColor4f(0.f, 0.3f, 0.7f, 1);
+	/*glBegin(GL_POINTS);
 	for (auto &p : particles)
 		glVertex2f(p.x.x, p.x.y);
-	glEnd();
+	glEnd();*/
+	//for (auto &p : particles)
+		//cout << p.x.x << endl;
+	//cout<< glutGet(GLUT_ELAPSED_TIME) / 1000.0 <<endl;
+	if (currentTime - oldTime <= 10.0) //10seg	
+		numOfFrames++;	
+	else {
+		cout << numOfFrames << endl;
+	}
+		
 
+	//oldTime = currentTime;
 	glutSwapBuffers();
 }
 
